@@ -231,7 +231,8 @@ func (s *Server) poke(c net.Conn) error {
 	unit := fs[0]
 	status, err := strconv.Atoi(fs[1])
 	if err != nil {
-		return fmt.Errorf("invalid status %q: %v", fs[1], err)
+		log.Printf("invalid status %q, assuming failure: %v", fs[1], err)
+		status = 255
 	}
 	s.Lock()
 	defer s.Unlock()
