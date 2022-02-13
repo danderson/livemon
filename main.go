@@ -60,7 +60,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "runtime-dir",
 						Usage: "directory in which to place the local control socket",
-						Value: "/var/lib/livemon",
+						Value: "/run/livemon",
 					},
 				},
 			},
