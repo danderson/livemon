@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/go-systemd/activation"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -31,24 +32,13 @@ func main() {
 				Usage:  "run the livemon daemon",
 				Action: serve,
 				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:  "addr",
-						Value: "[::1]:9843",
-						Usage: "address of the prometheus metrics server",
-					},
-					&cli.StringFlag{
-						Name:    "runtime-dir",
-						Usage:   "directory in which to place the local control socket",
-						EnvVars: []string{"RUNTIME_DIRECTORY"},
-					},
-					&cli.StringFlag{
-						Name:    "state-dir",
-						Usage:   "directory in which to persist state",
-						EnvVars: []string{"STATE_DIRECTORY"},
-					},
 					&cli.BoolFlag{
 						Name:  "tailscale-only",
 						Usage: "only allow metrics collection over Tailscale",
+					},
+					&cli.BoolFlag{
+						Name:  "dev",
+						Usage: "dev mode: listen on localhost:9843 and filemon.sock in current dir",
 					},
 				},
 			},
@@ -58,9 +48,9 @@ func main() {
 				Action: poke,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:  "runtime-dir",
-						Usage: "directory in which to place the local control socket",
-						Value: "/run/livemon",
+						Name:  "sock",
+						Usage: "socket to talk to livemon",
+						Value: "/run/livemon/livemon.sock",
 					},
 				},
 			},
@@ -78,11 +68,10 @@ func poke(c *cli.Context) error {
 		return fmt.Errorf("usage error, need 2 args")
 	}
 
-	sockDir := c.String("runtime-dir")
-	if sockDir == "" {
-		return fmt.Errorf("no --runtime-dir provided")
+	sockPath := c.String("sock")
+	if sockPath == "" {
+		return fmt.Errorf("no --sock provided")
 	}
-	sockPath := filepath.Join(sockDir, "livemon.sock")
 
 	unit, state := c.Args().Get(0), c.Args().Get(1)
 
@@ -104,19 +93,38 @@ func poke(c *cli.Context) error {
 
 func serve(c *cli.Context) error {
 	var (
-		addr     = c.String("addr")
-		sockDir  = c.String("runtime-dir")
-		stateDir = c.String("state-dir")
+		httpLn, ctlLn net.Listener
+		stateDir      string
+		err           error
 	)
 
-	if sockDir == "" {
-		return fmt.Errorf("no --runtime-dir provided")
-	}
-	if stateDir == "" {
-		return fmt.Errorf("no --state-dir provided")
+	if c.Bool("dev") {
+		stateDir = "."
+		httpLn, err = net.Listen("tcp", "[::1]:9843")
+		if err != nil {
+			return err
+		}
+		os.Remove("livemon.sock")
+		ctlLn, err = net.Listen("unix", "livemon.sock")
+		if err != nil {
+			return err
+		}
+		log.Println("running in dev mode")
+	} else {
+		stateDir = os.Getenv("STATE_DIRECTORY")
+		if stateDir == "" {
+			return fmt.Errorf("missing STATE_DIRECTORY")
+		}
+		listeners, err := activation.Listeners()
+		if err != nil {
+			return fmt.Errorf("getting listeners from systemd: %v", err)
+		}
+		if len(listeners) != 2 {
+			return fmt.Errorf("wrong size FD vector from systemd: got %d, want 2", len(listeners))
+		}
+		httpLn, ctlLn = listeners[0], listeners[1]
 	}
 
-	sockPath := filepath.Join(sockDir, "livemon.sock")
 	statePath := filepath.Join(stateDir, "livemon.state")
 
 	state, err := loadState(statePath)
@@ -139,7 +147,7 @@ func serve(c *cli.Context) error {
 		}, []string{"unit"}),
 		st: state,
 	}
-	return s.ListenAndServe(addr, sockPath)
+	return s.Serve(httpLn, ctlLn)
 }
 
 type Server struct {
@@ -152,7 +160,7 @@ type Server struct {
 	lastSuccess *prometheus.GaugeVec
 }
 
-func (s *Server) ListenAndServe(httpAddr, sockPath string) error {
+func (s *Server) Serve(httpLn, ctlLn net.Listener) error {
 	s.Lock()
 	s.updateMetricsLocked()
 	s.Unlock()
@@ -161,7 +169,6 @@ func (s *Server) ListenAndServe(httpAddr, sockPath string) error {
 
 	errc := make(chan error, 2)
 	srv := &http.Server{
-		Addr: httpAddr,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if s.tailscaleOnly {
 				who, err := tailscale.WhoIs(r.Context(), r.RemoteAddr)
@@ -174,12 +181,12 @@ func (s *Server) ListenAndServe(httpAddr, sockPath string) error {
 		}),
 	}
 	go func() {
-		if err := srv.ListenAndServe(); err != nil {
+		if err := srv.Serve(httpLn); err != nil {
 			errc <- err
 		}
 	}()
 	go func() {
-		errc <- s.listenAndServe(sockPath)
+		errc <- s.serveCtl(ctlLn)
 	}()
 
 	return <-errc
@@ -196,14 +203,7 @@ func (s *Server) updateMetricsLocked() {
 	}
 }
 
-func (s *Server) listenAndServe(sockPath string) error {
-	os.Remove(sockPath)
-	ln, err := net.Listen("unix", sockPath)
-	if err != nil {
-		return err
-	}
-	defer ln.Close()
-
+func (s *Server) serveCtl(ln net.Listener) error {
 	for {
 		c, err := ln.Accept()
 		if err != nil {
