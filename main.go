@@ -20,9 +20,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	cli "github.com/urfave/cli/v2"
+	"tailscale.com/client/tailscale"
 )
-
-var ()
 
 func main() {
 	app := cli.App{
@@ -46,6 +45,10 @@ func main() {
 						Name:    "state-dir",
 						Usage:   "directory in which to persist state",
 						EnvVars: []string{"STATE_DIRECTORY"},
+					},
+					&cli.BoolFlag{
+						Name:  "tailscale-only",
+						Usage: "only allow metrics collection over Tailscale",
 					},
 				},
 			},
@@ -122,7 +125,8 @@ func serve(c *cli.Context) error {
 	}
 
 	s := &Server{
-		statePath: statePath,
+		statePath:     statePath,
+		tailscaleOnly: c.Bool("tailscale-only"),
 		lastTouched: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "livemon",
 			Name:      "last_touched",
@@ -139,7 +143,8 @@ func serve(c *cli.Context) error {
 }
 
 type Server struct {
-	statePath string
+	statePath     string
+	tailscaleOnly bool
 
 	sync.Mutex
 	st          *State
@@ -155,8 +160,21 @@ func (s *Server) ListenAndServe(httpAddr, sockPath string) error {
 	http.Handle("/metrics", promhttp.Handler())
 
 	errc := make(chan error, 2)
+	srv := &http.Server{
+		Addr: httpAddr,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if s.tailscaleOnly {
+				who, err := tailscale.WhoIs(r.Context(), r.RemoteAddr)
+				if err != nil || who.UserProfile == nil {
+					http.Error(w, "access denied", http.StatusForbidden)
+					return
+				}
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		}),
+	}
 	go func() {
-		if err := http.ListenAndServe(httpAddr, nil); err != nil {
+		if err := srv.ListenAndServe(); err != nil {
 			errc <- err
 		}
 	}()
