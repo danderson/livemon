@@ -74,6 +74,7 @@ func main() {
 }
 
 func poke(c *cli.Context) error {
+	log.Print(c.Args().Slice())
 	if c.Args().Len() != 2 {
 		return fmt.Errorf("usage error, need 2 args")
 	}
