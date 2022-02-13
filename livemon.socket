@@ -1,0 +1,8 @@
+[Socket]
+ListenStream=9843
+ListenStream=/run/livemon/livemon.sock
+ReusePort=true
+FreeBind=true
+
+[Install]
+WantedBy=multi-user.target
