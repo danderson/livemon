@@ -1,9 +1,11 @@
 [Service]
 ExecStart=/usr/bin/livemon daemon
 StateDirectory=livemon
+StateDirectoryMode=0700
 Restart=on-failure
 ProtectProc=invisible
 ProcSubset=pid
+DynamicUser=true
 CapabilityBoundingSet=
 AmbientCapabilities=
 NoNewPrivileges=true
@@ -13,7 +15,9 @@ ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 PrivateDevices=true
+PrivateNetwork=true
 PrivateIPC=true
+PrivateUsers=true
 ProtectHostname=true
 ProtectClock=true
 ProtectKernelTunables=true
