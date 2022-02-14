@@ -1,3 +1,6 @@
+[Unit]
+RefuseManualStart=true
+
 [Service]
 ExecStart=/usr/bin/livemon daemon
 StateDirectory=livemon
