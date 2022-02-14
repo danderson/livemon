@@ -1,6 +1,9 @@
 [Socket]
 ListenStream=9843
 ListenStream=/run/livemon/livemon.sock
+SocketUser=root
+SocketGroup=root
+SocketMode=0660
 ReusePort=true
 FreeBind=true
 
