@@ -1,26 +1,26 @@
 {
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem
+  outputs = { self, nixpkgs, flake-utils }: let
+    mkPkg = pkgs: pkgs.buildGo117Module rec {
+      name = "livemon";
+      src = ./.;
+      vendorSha256 = "sha256-fdDPTvhdpd4mL04OikkO2+5csyE3o8VB/Ih/m2UGaiw=";
+      postInstall = ''
+        sed -i -e "s#/usr/bin#$out/bin#" livemon.service
+        install -D -m0444 -t $out/lib/systemd/system livemon.service
+      '';
+    };
+  in
+    (flake-utils.lib.eachDefaultSystem
       (system: let
         pkgs = nixpkgs.legacyPackages.${system};
-        pkg = pkgs.buildGo117Module rec {
-          name = "livemon";
-          src = ./.;
-          vendorSha256 = "sha256-fdDPTvhdpd4mL04OikkO2+5csyE3o8VB/Ih/m2UGaiw=";
-          postInstall = ''
-            sed -i -e "s#/usr/bin#$out/bin#" livemon.service
-            install -D -m0444 -t $out/lib/systemd/system livemon.service
-          '';
-        };
+        pkg = mkPkg pkgs;
       in {
         packages.livemon = pkg;
         defaultPackage = pkg;
-        overlay = final: prev: {
-          livemon = pkg;
-        };
-        nixosModule = { config, lib }: let
+      })) // {
+        nixosModules.livemon = { config, lib, pkgs, ... }: let
           cfg = config.services.livemon;
         in {
           options.services.livemon = {
@@ -43,12 +43,12 @@
           };
 
           config = lib.mkIf cfg.enable {
-            systemd.packages = [ pkg ];
+            systemd.packages = [ (mkPkg pkgs) ];
             systemd.sockets.livemon.listenStreams = [
               "${cfg.listenAddr}:${cfg.listenPort}"
               "/run/livemon/livemon.sock"
             ];
           };
         };
-      });
+      };
 }
