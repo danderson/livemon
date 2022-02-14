@@ -8,6 +8,7 @@
       vendorSha256 = "sha256-fdDPTvhdpd4mL04OikkO2+5csyE3o8VB/Ih/m2UGaiw=";
       postInstall = ''
         sed -i -e "s#/usr/bin#$out/bin#" livemon.service
+        sed -i -e "/ListenStream/d" livemon.socket
         install -D -m0444 -t $out/lib/systemd/system livemon.service livemon.socket
       '';
     };
