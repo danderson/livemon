@@ -44,10 +44,13 @@
 
           config = lib.mkIf cfg.enable {
             systemd.packages = [ (mkPkg pkgs) ];
-            systemd.sockets.livemon.listenStreams = [
-              "${cfg.listenAddr}:${builtins.toString cfg.listenPort}"
-              "/run/livemon/livemon.sock"
-            ];
+            systemd.sockets.livemon = {
+              enable = true;
+              listenStreams = [
+                "${cfg.listenAddr}:${builtins.toString cfg.listenPort}"
+                "/run/livemon/livemon.sock"
+              ];
+            };
           };
         };
       };
