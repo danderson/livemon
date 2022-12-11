@@ -1,8 +1,9 @@
 {
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = { self, nixpkgs, flake-utils }: let
-    mkPkg = pkgs: pkgs.buildGo117Module rec {
+    mkPkg = pkgs: pkgs.buildGo119Module rec {
       name = "livemon";
       src = ./.;
       vendorSha256 = "sha256-fdDPTvhdpd4mL04OikkO2+5csyE3o8VB/Ih/m2UGaiw=";
