@@ -38,3 +38,6 @@ RemoveIPC=true
 PrivateMounts=true
 SystemCallFilter=@system-service
 SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

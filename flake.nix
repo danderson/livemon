@@ -48,9 +48,10 @@
       in lib.mkIf cfg.enable  {
         environment.systemPackages = [ pkg ];
         systemd.packages = [ pkg ];
-        #systemd.services.livemon.serviceConfig = {
-        #  ExecStart = "${pkg}/bin/livemon daemon --adds=localhost:9843 --unix=/run/livemon/livemon.sock";
-        #};
+        systemd.services.livemon.serviceConfig.ExecStart = [
+          ""
+          "${pkg}/bin/livemon daemon --addr=${cfg.listenAddr}:${builtins.toString cfg.listenPort} --unix=/run/livemon/livemon.sock"
+        ];
       };
     };
   in
