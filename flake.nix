@@ -44,10 +44,12 @@
         };
       };
 
-      config = lib.mkIf cfg.enable {
-        systemd.packages = [ (livemon pkgs) ];
+      config = let
+        pkg = livemon pkgs;
+      in lib.mkIf cfg.enable  {
+        environment.systemPackages = [ pkg ];
+        systemd.packages = [ pkg ];
         systemd.sockets.livemon = {
-          wantedBy = ["multi-user.target"];
           listenStreams = [
             "${cfg.listenAddr}:${builtins.toString cfg.listenPort}"
             "/run/livemon/livemon.sock"
