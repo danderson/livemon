@@ -52,9 +52,6 @@
             "${cfg.listenAddr}:${builtins.toString cfg.listenPort}"
             "/run/livemon/livemon.sock"
           ];
-          unitConfig = {
-            PropagatesStopTo = "livemon.service";
-          };
         };
       };
     };

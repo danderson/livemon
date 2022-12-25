@@ -33,8 +33,9 @@ func main() {
 				Action: serve,
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
-						Name:  "tailscale-only",
-						Usage: "only allow metrics collection over Tailscale",
+						Name:        "tailscale-only",
+						Usage:       "only allow metrics collection over Tailscale",
+						DefaultText: "true",
 					},
 					&cli.BoolFlag{
 						Name:  "dev",
