@@ -16,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-systemd/activation"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -32,14 +31,20 @@ func main() {
 				Usage:  "run the livemon daemon",
 				Action: serve,
 				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "addr",
+						Usage:       "address to listen on",
+						DefaultText: "localhost:9843",
+					},
+					&cli.PathFlag{
+						Name:        "unix",
+						Usage:       "unix socket to listen on",
+						DefaultText: "livemon.sock",
+					},
 					&cli.BoolFlag{
 						Name:        "tailscale-only",
 						Usage:       "only allow metrics collection over Tailscale",
 						DefaultText: "true",
-					},
-					&cli.BoolFlag{
-						Name:  "dev",
-						Usage: "dev mode: listen on localhost:9843 and filemon.sock in current dir",
 					},
 				},
 			},
@@ -93,37 +98,18 @@ func poke(c *cli.Context) error {
 }
 
 func serve(c *cli.Context) error {
-	var (
-		httpLn, ctlLn net.Listener
-		stateDir      string
-		err           error
-	)
-
-	if c.Bool("dev") {
+	stateDir := os.Getenv("STATE_DIRECTORY")
+	if stateDir == "" {
 		stateDir = "."
-		httpLn, err = net.Listen("tcp", "[::1]:9843")
-		if err != nil {
-			return err
-		}
-		os.Remove("livemon.sock")
-		ctlLn, err = net.Listen("unix", "livemon.sock")
-		if err != nil {
-			return err
-		}
-		log.Println("running in dev mode")
-	} else {
-		stateDir = os.Getenv("STATE_DIRECTORY")
-		if stateDir == "" {
-			return fmt.Errorf("missing STATE_DIRECTORY")
-		}
-		listeners, err := activation.Listeners()
-		if err != nil {
-			return fmt.Errorf("getting listeners from systemd: %v", err)
-		}
-		if len(listeners) != 2 {
-			return fmt.Errorf("wrong size FD vector from systemd: got %d, want 2", len(listeners))
-		}
-		httpLn, ctlLn = listeners[0], listeners[1]
+	}
+
+	httpLn, err := net.Listen("tcp", c.String("addr"))
+	if err != nil {
+		return err
+	}
+	ctlLn, err := net.Listen("unix", c.Path("unix"))
+	if err != nil {
+		return err
 	}
 
 	statePath := filepath.Join(stateDir, "livemon.state")

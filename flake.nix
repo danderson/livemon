@@ -9,8 +9,7 @@
       vendorSha256 = "sha256-++SNlauqfk3RkwlocO3Yc7Hl/fxscLWwlMIL906A/n4=";
       postInstall = ''
          sed -i -e "s#/usr/bin#$out/bin#" livemon.service
-         sed -i -e "/ListenStream/d" livemon.socket
-         install -D -m0444 -t $out/lib/systemd/system livemon.service livemon.socket
+         install -D -m0444 -t $out/lib/systemd/system livemon.service
       '';
     };
 
@@ -49,12 +48,9 @@
       in lib.mkIf cfg.enable  {
         environment.systemPackages = [ pkg ];
         systemd.packages = [ pkg ];
-        systemd.sockets.livemon = {
-          listenStreams = [
-            "${cfg.listenAddr}:${builtins.toString cfg.listenPort}"
-            "/run/livemon/livemon.sock"
-          ];
-        };
+        #systemd.services.livemon.serviceConfig = {
+        #  ExecStart = "${pkg}/bin/livemon daemon --adds=localhost:9843 --unix=/run/livemon/livemon.sock";
+        #};
       };
     };
   in

@@ -2,9 +2,11 @@
 RefuseManualStart=true
 
 [Service]
-ExecStart=/usr/bin/livemon daemon
+ExecStart=/usr/bin/livemon daemon --addr=[::]:9843 --unix=/run/livemon/livemon.sock
 StateDirectory=livemon
 StateDirectoryMode=0700
+RuntimeDirectory=livemon
+RuntimeDirectoryMode=0700
 Restart=on-failure
 ProtectProc=invisible
 ProcSubset=pid
