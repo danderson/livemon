@@ -6,7 +6,7 @@
     livemon = pkgs: pkgs.buildGo119Module rec {
       name = "livemon";
       src = ./.;
-      vendorSha256 = "sha256-++SNlauqfk3RkwlocO3Yc7Hl/fxscLWwlMIL906A/n4=";
+      vendorSha256 = "sha256-5e7Q83JYtPkIqJDtQ1zE81EeYkD+FOOCfkSGK8IG0VE=";
       postInstall = ''
          sed -i -e "s#/usr/bin#$out/bin#" livemon.service
          install -D -m0444 -t $out/lib/systemd/system livemon.service
