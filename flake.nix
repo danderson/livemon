@@ -3,7 +3,7 @@
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = { self, nixpkgs, flake-utils }: let
-    livemon = pkgs: pkgs.buildGo119Module rec {
+    livemon = pkgs: pkgs.buildGo122Module rec {
       name = "livemon";
       src = ./.;
       vendorSha256 = "sha256-5e7Q83JYtPkIqJDtQ1zE81EeYkD+FOOCfkSGK8IG0VE=";
